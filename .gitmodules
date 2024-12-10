@@ -18,3 +18,9 @@
 [submodule "submodules/libcyphal"]
 	path = submodules/libcyphal
 	url = https://github.com/OpenCyphal-Garage/libcyphal.git
+[submodule "submodules/pydsdl"]
+	path = submodules/pydsdl
+	url = https://github.com/OpenCyphal/pydsdl.git
+[submodule "submodules/nunavut"]
+	path = submodules/nunavut
+	url = https://github.com/OpenCyphal/nunavut.git

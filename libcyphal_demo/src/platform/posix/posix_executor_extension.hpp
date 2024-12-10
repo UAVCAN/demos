@@ -10,6 +10,7 @@
 #include <cetl/pf17/cetlpf.hpp>
 #include <cetl/rtti.hpp>
 #include <libcyphal/executor.hpp>
+#include <libcyphal/transport/errors.hpp>
 
 namespace platform
 {
@@ -46,6 +47,10 @@ public:
     CETL_NODISCARD virtual libcyphal::IExecutor::Callback::Any registerAwaitableCallback(
         libcyphal::IExecutor::Callback::Function&& function,
         const Trigger::Variant&                    trigger) = 0;
+
+    using PollFailure = cetl::variant<libcyphal::transport::PlatformError, libcyphal::ArgumentError>;
+
+    virtual cetl::optional<PollFailure> pollAwaitableResourcesFor(const cetl::optional<libcyphal::Duration> timeout) const = 0;
 
     // MARK: RTTI
 

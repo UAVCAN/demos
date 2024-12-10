@@ -18,7 +18,8 @@ by replacing the POSIX socket API and stdio with suitable alternatives;
 for details, please consult with:
 - `platform/posix/udp/*` files regarding UDP transport
 - `platform/linux/can/*` files regarding CAN transport
-- `platform/linux/epoll_single_threaded_executor.hpp` file regarding the executor
+- `platform/linux/epoll_single_threaded_executor.hpp` file regarding the executor using epoll (Debian)
+- `platform/linux/kqueue_single_threaded_executor.hpp` file regarding the executor using kqueue (BSD/Darwin)
 - `platform/storage.hpp` file regarding the non-volatile storage
 - `platform/o1_heap_memory_resource.hpp` file regarding the memory resource
 
@@ -35,6 +36,13 @@ Build the demo:
 ```shell
 git clone --recursive https://github.com/OpenCyphal/demos
 cd demos/libcyphal_demo
-mkdir build && cd build
-cmake .. && make
+```
+Then one of the two presets depending on your system:
+
+- `Demo-Debian` - Debian-based Linux distros like Ubuntu.
+- `Demo-Darwin` – Mac OS
+
+```
+cmake --preset Demo-Debian
+cmake --build --preset Demo-Debian-Debug
 ```

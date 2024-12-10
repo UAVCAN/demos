@@ -13,11 +13,11 @@ add_executable(
         ${CMAKE_SOURCE_DIR}/src/main.cpp
         ${CMAKE_SOURCE_DIR}/src/no_cpp_heap.cpp
 )
-target_link_libraries(demo PRIVATE canard o1heap udpard shared_socketcan shared_udp)
+target_link_libraries(demo PRIVATE canard o1heap udpard shared_udp ${transpiled_headers})
 target_include_directories(demo PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_include_directories(demo PRIVATE ${submodules}/cetl/include)
 target_include_directories(demo PRIVATE ${submodules}/libcyphal/include)
-add_dependencies(demo dsdl_uavcan)
+add_dependencies(demo ${transpiled_headers})
 
 if (STATIC_ANALYSIS)
     set_target_properties(demo PROPERTIES C_CLANG_TIDY "${clang_tidy}")

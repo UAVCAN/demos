@@ -6,8 +6,8 @@
 
 #include "application.hpp"
 #include "exec_cmd_provider.hpp"
-#include "transport_bag_can.hpp"
 #include "transport_bag_udp.hpp"
+#include "platform/posix/posix_executor_extension.hpp"
 
 #include <cetl/pf17/cetlpf.hpp>
 #include <libcyphal/application/node.hpp>
@@ -97,6 +97,7 @@ enum class ExitCode : std::uint8_t
     RegistryCreationFailure        = 3,
     ExecCmdProviderCreationFailure = 4,
     RestartFailure                 = 5,
+    ConfigurationFailure           = 6,
 
 };  // ExitCode
 
@@ -112,16 +113,17 @@ libcyphal::Expected<bool, ExitCode> run_application()
     auto node_params  = application.getNodeParams();
     auto iface_params = application.getIfaceParams();
 
+    auto* posix_executor = cetl::rtti_cast<platform::posix::IPosixExecutorExtension*>(&executor);
+    if (nullptr == posix_executor) {
+        return ExitCode::ConfigurationFailure;
+    }
+
     // 1. Create the transport layer object. First try CAN, then UDP.
     //
-    TransportBagCan transport_bag_can{general_mr, executor, media_block_mr};
+    //TransportBagCan transport_bag_can{general_mr, executor, media_block_mr};
     TransportBagUdp transport_bag_udp{general_mr, executor, media_block_mr};
     //
-    libcyphal::transport::ITransport* transport_iface = transport_bag_can.create(iface_params);
-    if (transport_iface == nullptr)
-    {
-        transport_iface = transport_bag_udp.create(iface_params);
-    }
+    libcyphal::transport::ITransport* transport_iface = transport_bag_udp.create(iface_params);
     if (transport_iface == nullptr)
     {
         std::cerr << "❌ Failed to create any transport.\n";
@@ -202,7 +204,7 @@ libcyphal::Expected<bool, ExitCode> run_application()
         {
             timeout = std::min(timeout, spin_result.next_exec_time.value() - executor.now());
         }
-        (void) executor.pollAwaitableResourcesFor(cetl::make_optional(timeout));
+        (void) posix_executor->pollAwaitableResourcesFor(cetl::make_optional(timeout));
     }
     //
     std::cout << "🏁 Done.\n-----------\nRun Stats:\n";
@@ -224,7 +226,7 @@ int main(const int, char* const argv[])
     // Should we restart?
     if (cetl::get<bool>(result))
     {
-        (void) ::execve(argv[0], argv, ::environ);  // NOLINT
+        //(void) ::execve(argv[0], argv, ::environ);  // NOLINT
         return static_cast<int>(ExitCode::RestartFailure);
     }
 

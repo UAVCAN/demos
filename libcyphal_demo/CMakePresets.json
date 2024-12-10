@@ -1,0 +1,119 @@
+{
+    "version": 7,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 27,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "config-common",
+            "hidden": true,
+            "description": "Common configuration",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build",
+            "warnings": {
+                "deprecated": true,
+                "uninitialized": true
+            },
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_CONFIGURATION_TYPES": "Release;Debug",
+                "CMAKE_CROSS_CONFIGS": "all",
+                "CMAKE_DEFAULT_BUILD_TYPE": "Release",
+                "CMAKE_DEFAULT_CONFIGS": "Release",
+                "CMAKE_PREFIX_PATH": "${sourceDir}/../submodules/nunavut"
+            }
+        },
+        {
+            "name": "config-linux-debian",
+            "hidden": true,
+            "cacheVariables": {
+                "PLATFORM_LINUX_TYPE": "debian",
+                "PLATFORM_OS_TYPE": "generic"
+            }
+        },
+        {
+            "name": "config-linux-bsd",
+            "hidden": true,
+            "cacheVariables": {
+                "PLATFORM_LINUX_TYPE": "bsd",
+                "PLATFORM_OS_TYPE": "generic"
+            }
+        },
+        {
+            "name": "config-linux-darwin",
+            "hidden": true,
+            "inherits": [
+                "config-linux-bsd"
+            ],
+            "cacheVariables": {
+                "PLATFORM_OS_TYPE": "Darwin"
+            }
+        },
+        {
+            "name": "Demo-Debian",
+            "displayName": "Debian Linux demo",
+            "description": "Configures an example application for Linux distributions derived from Debian.",
+            "inherits": [
+                "config-common",
+                "config-linux-debian"
+            ]
+        },
+        {
+            "name": "Demo-Darwin",
+            "displayName": "Darwin Linux demo",
+            "description": "Configures an example application for Mac OS",
+            "inherits": [
+                "config-common",
+                "config-linux-darwin"
+            ],
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "Demo-Darwin-Release",
+            "displayName": "Darwin Linux demo (Release)",
+            "description": "Configures an example application for Mac OS",
+            "configurePreset": "Demo-Darwin",
+            "configuration": "Release",
+            "targets": [
+                "demo"
+            ]
+        },
+        {
+            "name": "Demo-Darwin-Debug",
+            "displayName": "Darwin Linux demo (Debug)",
+            "description": "Configures an example application for Mac OS",
+            "configurePreset": "Demo-Darwin",
+            "configuration": "Debug",
+            "targets": [
+                "demo"
+            ]
+        },
+        {
+            "name": "Demo-Debian-Release",
+            "displayName": "Debian Linux demo (Release)",
+            "description": "Configures an example application for Debian Linux distributions",
+            "configurePreset": "Demo-Debian",
+            "configuration": "Release",
+            "targets": [
+                "demo"
+            ]
+        },
+        {
+            "name": "Demo-Debian-Debug",
+            "displayName": "Debian Linux demo (Debug)",
+            "description": "Configures an example application for Debian Linux distributions",
+            "configurePreset": "Demo-Debian",
+            "configuration": "Debug",
+            "targets": [
+                "demo"
+            ]
+        }
+    ]
+}

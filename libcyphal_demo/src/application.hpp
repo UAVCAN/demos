@@ -8,7 +8,7 @@
 #define APPLICATION_HPP
 
 #include "platform/block_memory_resource.hpp"
-#include "platform/linux/epoll_single_threaded_executor.hpp"
+#include "platform/linux/single_threaded_executor.hpp"
 #include "platform/o1_heap_memory_resource.hpp"
 #include "platform/storage.hpp"
 #include "platform/string.hpp"
@@ -178,7 +178,7 @@ public:
         // clang-format off
         StringParam<MaxIfaceLen>    can_iface_   {  "uavcan.can.iface",         registry_,  {"vcan0"},      {true}};
         StringParam<MaxNodeDesc>    node_desc_   {  "uavcan.node.description",  registry_,  {NODE_NAME},    {true}};
-        Natural16Param<1>           node_id_     {  "uavcan.node.id",           registry_,  {65535U},       {true}};
+        Natural16Param<1>           node_id_     {  "uavcan.node.id",           registry_,  {15},       {true}};
         StringParam<MaxIfaceLen>    udp_iface_   {  "uavcan.udp.iface",         registry_,  {"127.0.0.1"},  {true}};
         Register<RegisterFootprint> sys_info_mem_block_;
         Register<RegisterFootprint> sys_info_mem_general_;
@@ -206,7 +206,7 @@ public:
     Application(Application&&)                 = delete;
     Application& operator=(Application&&)      = delete;
 
-    CETL_NODISCARD platform::Linux::EpollSingleThreadedExecutor& executor() noexcept
+    CETL_NODISCARD libcyphal::platform::SingleThreadedExecutor& executor() noexcept
     {
         return executor_;
     }
@@ -244,7 +244,7 @@ public:
 private:
     // MARK: Data members:
 
-    platform::Linux::EpollSingleThreadedExecutor executor_;
+    platform::Linux::SingleThreadedExecutor      executor_;
     platform::O1HeapMemoryResource               o1_heap_mr_;
     platform::BlockMemoryResource                media_block_mr_;
     platform::storage::KeyValue                  storage_;
