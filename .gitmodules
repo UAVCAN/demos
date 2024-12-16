@@ -18,3 +18,14 @@
 [submodule "submodules/libcyphal"]
 	path = submodules/libcyphal
 	url = https://github.com/OpenCyphal-Garage/libcyphal.git
+[submodule "submodules/pydsdl"]
+	path = submodules/pydsdl
+	url = https://github.com/OpenCyphal/pydsdl.git
+[submodule "submodules/nunavut"]
+	path = submodules/nunavut
+	url = https://github.com/OpenCyphal/nunavut.git
+	branch = 3.0.preview
+[submodule "submodules/ocvsmd"]
+	path = submodules/ocvsmd
+	url = https://github.com/OpenCyphal-Garage/opencyphal-vehicle-system-management-daemon.git
+	branch = sshirokov/capnp
