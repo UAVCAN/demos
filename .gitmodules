@@ -2,9 +2,6 @@
 	path = submodules/libcanard
 	url = https://github.com/UAVCAN/libcanard
 	branch = v4
-[submodule "submodules/public_regulated_data_types"]
-	path = submodules/public_regulated_data_types
-	url = https://github.com/UAVCAN/public_regulated_data_types
 [submodule "submodules/o1heap"]
 	path = submodules/o1heap
 	url = https://github.com/pavel-kirienko/o1heap
@@ -18,9 +15,6 @@
 [submodule "submodules/libcyphal"]
 	path = submodules/libcyphal
 	url = https://github.com/OpenCyphal-Garage/libcyphal.git
-[submodule "submodules/pydsdl"]
-	path = submodules/pydsdl
-	url = https://github.com/OpenCyphal/pydsdl.git
 [submodule "submodules/nunavut"]
 	path = submodules/nunavut
 	url = https://github.com/OpenCyphal/nunavut.git

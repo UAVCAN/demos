@@ -4,11 +4,12 @@
 # SPDX-License-Identifier: MIT
 # Author: Pavel Kirienko <pavel@opencyphal.org>
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.27)
 
 project(libudpard_demo C)
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
-set(submodules "${CMAKE_SOURCE_DIR}/../submodules")
+set(CMAKE_C_STANDARD 11)
+set(submodules "${CMAKE_CURRENT_SOURCE_DIR}/../submodules")
+set(CMAKE_PREFIX_PATH "${submodules}/nunavut")
 
 # Set up static analysis.
 set(STATIC_ANALYSIS ON CACHE BOOL "enable static analysis")
@@ -16,15 +17,17 @@ if (STATIC_ANALYSIS)
     # clang-tidy (separate config files per directory)
     find_program(clang_tidy NAMES clang-tidy)
     if (NOT clang_tidy)
-        message(FATAL_ERROR "Could not locate clang-tidy")
+        message(WARNING "Could not locate clang-tidy")
+        set(STATIC_ANALYSIS OFF)
+    else()
+        message(STATUS "Using clang-tidy: ${clang_tidy}")
     endif ()
-    message(STATUS "Using clang-tidy: ${clang_tidy}")
 endif ()
 
 # Forward the revision information to the compiler so that we could expose it at runtime. This is entirely optional.
 execute_process(
         COMMAND git rev-parse --short=16 HEAD
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         OUTPUT_VARIABLE vcs_revision_id
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -36,56 +39,47 @@ add_definitions(
         -DNODE_NAME="org.opencyphal.demos.libudpard"
 )
 
-# Transpile DSDL into C using Nunavut. Install Nunavut as follows: pip install nunavut.
-# Alternatively, you can invoke the transpiler manually or use https://nunaweb.opencyphal.org.
-find_package(nnvg REQUIRED)
-create_dsdl_target(             # Generate the support library for generated C headers, which is "nunavut.h".
-        "nunavut_support"
-        c
-        ${CMAKE_BINARY_DIR}/transpiled
-        ""
-        OFF
-        little
-        "only"
+# Transpile DSDL into C using Nunavut. This uses this repo's built-in submodules to setup Nunavut. See
+# CMAKE_PREFIX_PATH above for how this is resolved to the local submodules.
+find_package(Nunavut 3.0 REQUIRED)
+
+set(LOCAL_PUBLIC_TYPES
+    uavcan/node/7509.Heartbeat.1.0.dsdl
+    uavcan/node/port/7510.List.1.0.dsdl
+    uavcan/node/430.GetInfo.1.0.dsdl
+    uavcan/node/435.ExecuteCommand.1.1.dsdl
+    uavcan/register/384.Access.1.0.dsdl
+    uavcan/register/385.List.1.0.dsdl
+    uavcan/pnp/8165.NodeIDAllocationData.2.0.dsdl
+    uavcan/primitive/array/Real32.1.0.dsdl
 )
-set(dsdl_root_namespace_dirs                # List all DSDL root namespaces to transpile here.
-        ${submodules}/public_regulated_data_types/uavcan
-        ${submodules}/public_regulated_data_types/reg
+
+add_cyphal_library(
+     NAME dsdl_uavcan
+     EXACT_NAME
+     LANGUAGE c
+     LANGUAGE_STANDARD c${CMAKE_C_STANDARD}
+     DSDL_FILES ${LOCAL_PUBLIC_TYPES}
+     SERIALIZATION_ASSERT assert
+     EXPORT_MANIFEST
+     OUT_LIBRARY_TARGET LOCAL_TYPES_C_LIBRARY
 )
-foreach (ns_dir ${dsdl_root_namespace_dirs})
-    get_filename_component(ns ${ns_dir} NAME)
-    message(STATUS "DSDL namespace ${ns} at ${ns_dir}")
-    create_dsdl_target(
-            "dsdl_${ns}"                    # CMake target name
-            c                               # Target language to transpile into
-            ${CMAKE_BINARY_DIR}/transpiled  # Destination directory (add it to the includes)
-            ${ns_dir}                       # Source directory
-            OFF                             # Disable variable array capacity override
-            little                          # Endianness of the target platform (alternatives: "big", "any")
-            "never"                         # Support files are generated once in the nunavut_support target (above)
-            ${dsdl_root_namespace_dirs}     # Look-up DSDL namespaces
-    )
-    add_dependencies("dsdl_${ns}" nunavut_support)
-endforeach ()
-include_directories(SYSTEM ${CMAKE_BINARY_DIR}/transpiled)  # Make the transpiled headers available for inclusion.
-add_definitions(-DNUNAVUT_ASSERT=assert)
 
 # Define the LibUDPard static library build target. No special options are needed to use the library, it's very simple.
 add_library(udpard_demo STATIC ${submodules}/libudpard/libudpard/udpard.c)
 target_include_directories(udpard_demo INTERFACE SYSTEM ${submodules}/libudpard/libudpard)
 
-include(${CMAKE_SOURCE_DIR}/../shared/udp/udp.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../shared/udp/udp.cmake)
 
 # Define the demo application build target and link it with the library.
 add_executable(
         demo
-        ${CMAKE_SOURCE_DIR}/src/main.c
-        ${CMAKE_SOURCE_DIR}/src/storage.c
-        ${CMAKE_SOURCE_DIR}/src/register.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/main.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/storage.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/register.c
 )
 target_include_directories(demo PRIVATE ${submodules}/cavl)
-target_link_libraries(demo PRIVATE udpard_demo shared_udp)
-add_dependencies(demo dsdl_uavcan dsdl_reg)
+target_link_libraries(demo PRIVATE ${LOCAL_TYPES_C_LIBRARY} udpard_demo shared_udp)
 set_target_properties(
         demo
         PROPERTIES
