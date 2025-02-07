@@ -23,16 +23,20 @@
 namespace
 {
 
-constexpr std::size_t HeapSize = 16ULL * 1024ULL;
-alignas(O1HEAP_ALIGNMENT) std::array<cetl::byte, HeapSize> s_heap_arena{};
+constexpr std::size_t HeapSize = 128ULL * 1024ULL;
+alignas(O1HEAP_ALIGNMENT) std::array<cetl::byte, HeapSize> s_heap_arena{};  // NOLINT
+
+constexpr std::size_t BlockHeapSize = 128ULL * 1024ULL;
+alignas(O1HEAP_ALIGNMENT) std::array<cetl::byte, BlockHeapSize> s_block_heap_arena{};  // NOLINT
 
 }  // namespace
 
 Application::Application(const char* const root_path)
     : o1_heap_mr_{s_heap_arena}
+    , o1_block_heap_mr_{s_block_heap_arena}
+    , media_block_mr_{o1_block_heap_mr_}
     , storage_{root_path}
     , registry_{o1_heap_mr_}
-    , media_block_mr_{*cetl::pmr::new_delete_resource()}
     , regs_{o1_heap_mr_, registry_, media_block_mr_}
 {
     cetl::pmr::set_default_resource(&o1_heap_mr_);

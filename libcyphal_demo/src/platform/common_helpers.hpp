@@ -94,6 +94,8 @@ struct CommonHelpers
                     }),
                 report_var);
 
+            // "swallows" all transient failures, thus giving a chance
+            // to other redundant media interfaces to continue.
             return cetl::nullopt;
         }
 
@@ -154,6 +156,8 @@ struct CommonHelpers
                     }),
                 report_var);
 
+            // "swallows" all transient failures, thus giving a chance
+            // to other redundant media interfaces to continue.
             return cetl::nullopt;
         }
 

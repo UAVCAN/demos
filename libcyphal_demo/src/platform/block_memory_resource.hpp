@@ -36,7 +36,8 @@ public:
     };  // Diagnostics
 
     explicit BlockMemoryResource(cetl::pmr::memory_resource& memory)
-        : pool_ptr_{nullptr, {&memory, 0U}}
+        : memory_{memory}
+        , pool_ptr_{nullptr, {&memory, 0U}}
     {
     }
 
@@ -63,8 +64,7 @@ public:
         CETL_DEBUG_ASSERT(pool_size >= alignment, "");
         CETL_DEBUG_ASSERT(alignment && !(alignment & (alignment - 1)), "Should be a power of 2");
 
-        auto* const mr = pool_ptr_.get_deleter().resource();
-        pool_ptr_      = PoolPtr{mr->allocate(pool_size), {mr, pool_size}};
+        pool_ptr_ = PoolPtr{memory_.allocate(pool_size), {&memory_, pool_size}};
         if (!pool_ptr_)
         {
             CETL_DEBUG_ASSERT(false, "Failed to allocate memory pool");
@@ -176,15 +176,16 @@ protected:
 private:
     using PoolPtr = std::unique_ptr<void, cetl::pmr::MemoryResourceDeleter<cetl::pmr::memory_resource>>;
 
-    PoolPtr     pool_ptr_;
-    std::size_t alignment_{0U};
-    void**      head_{nullptr};
-    std::size_t block_count_{0U};
-    std::size_t block_size_{0U};
-    std::size_t used_blocks_{0U};
-    std::size_t used_blocks_peak_{0U};
-    std::size_t request_count_{0U};
-    std::size_t oom_count_{0U};
+    cetl::pmr::memory_resource& memory_;
+    PoolPtr                     pool_ptr_;
+    std::size_t                 alignment_{0U};
+    void**                      head_{nullptr};
+    std::size_t                 block_count_{0U};
+    std::size_t                 block_size_{0U};
+    std::size_t                 used_blocks_{0U};
+    std::size_t                 used_blocks_peak_{0U};
+    std::size_t                 request_count_{0U};
+    std::size_t                 oom_count_{0U};
 
     // See `do_allocate` special case for zero bytes.
     // Note that we still need at least one byte - b/c `std::array<..., 0>::data()` returns `nullptr`.

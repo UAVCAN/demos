@@ -7,6 +7,7 @@
 #include <cetl/cetl.hpp>
 
 #include <cstddef>
+#include <cstdlib>
 #include <iostream>
 
 #if (__cplusplus >= CETL_CPP_STANDARD_17)

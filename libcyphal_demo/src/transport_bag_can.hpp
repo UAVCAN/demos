@@ -66,13 +66,23 @@ struct TransportBagCan final
         const std::size_t     pool_size       = media_collection_.count() * TxQueueCapacity * block_size;
         media_block_mr_.setup(pool_size, block_size, block_alignment);
 
-        transport_->setTransientErrorHandler(platform::CommonHelpers::Can::transientErrorReporter);
+        // To support redundancy (multiple homogeneous interfaces), it's important to have a non-default
+        // handler which "swallows" expected transient failures (by returning `nullopt` result).
+        // Otherwise, the default Cyphal behavior will fail/interrupt current and future transfers
+        // if some of its media encounter transient failures - thus breaking the whole redundancy goal,
+        // namely, maintain communication if at least one of the interfaces is still up and running.
+        //
+        transport_->setTransientErrorHandler([](auto&) { return cetl::nullopt; });
+        // transport_->setTransientErrorHandler(platform::CommonHelpers::Can::transientErrorReporter);
 
         return transport_.get();
     }
 
 private:
-    static constexpr std::size_t TxQueueCapacity = 16;
+    // Our current max `SerializationBufferSizeBytes` is 515 bytes (for `uavcan.register.Access.Request.1.0`)
+    // Assuming CAN classic presentation MTU of 7 bytes (plus a bit of overhead like CRC and stuff),
+    // let's calculate the required TX queue capacity, and make it twice to accommodate 2 such messages.
+    static constexpr std::size_t TxQueueCapacity = 2 * (515U + 8U) / 7U;
 
     cetl::pmr::memory_resource&                                    general_mr_;
     libcyphal::IExecutor&                                          executor_;

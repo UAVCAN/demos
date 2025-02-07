@@ -16,7 +16,6 @@
 #include <cetl/pf17/cetlpf.hpp>
 #include <libcyphal/application/registry/register.hpp>
 #include <libcyphal/application/registry/registry_impl.hpp>
-#include <libcyphal/platform/storage.hpp>
 
 #include <algorithm>
 #include <array>
@@ -247,6 +246,7 @@ private:
 
     platform::Linux::EpollSingleThreadedExecutor executor_;
     platform::O1HeapMemoryResource               o1_heap_mr_;
+    platform::O1HeapMemoryResource               o1_block_heap_mr_;
     platform::BlockMemoryResource                media_block_mr_;
     platform::storage::KeyValue                  storage_;
     libcyphal::application::registry::Registry   registry_;

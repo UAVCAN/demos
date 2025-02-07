@@ -6,13 +6,17 @@
 
 #include "application.hpp"
 #include "exec_cmd_provider.hpp"
+#include "file_downloader.hpp"
 #include "transport_bag_can.hpp"
 #include "transport_bag_udp.hpp"
 
 #include <cetl/pf17/cetlpf.hpp>
 #include <libcyphal/application/node.hpp>
 #include <libcyphal/presentation/presentation.hpp>
+#include <libcyphal/time_provider.hpp>
+#include <libcyphal/transport/transfer_id_map.hpp>
 #include <libcyphal/transport/transport.hpp>
+#include <libcyphal/transport/types.hpp>
 #include <libcyphal/types.hpp>
 
 #include <uavcan/node/Health_1_0.hpp>
@@ -21,11 +25,12 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <cstring>
+#include <functional>
 #include <iomanip>
 #include <ios>
 #include <iostream>
-#include <unistd.h>  // execve
+#include <unistd.h>
+#include <unordered_map>
 #include <utility>
 
 using namespace std::chrono_literals;
@@ -38,11 +43,14 @@ namespace
 class AppExecCmdProvider final : public ExecCmdProvider<AppExecCmdProvider>
 {
 public:
-    AppExecCmdProvider(libcyphal::application::Node&                node,
-                       const libcyphal::presentation::Presentation& presentation,
-                       Server&&                                     server)
+    AppExecCmdProvider(libcyphal::application::Node&          node,
+                       libcyphal::presentation::Presentation& presentation,
+                       libcyphal::ITimeProvider&              time_provider,
+                       Server&&                               server)
         : ExecCmdProvider{presentation, std::move(server)}
         , node_{node}
+        , presentation_{presentation}
+        , time_provider_{time_provider}
     {
     }
 
@@ -57,9 +65,10 @@ public:
     }
 
 private:
-    bool onCommand(const Request::_traits_::TypeOf::command command,
-                   const cetl::string_view                  parameter,
-                   Response&                                response) noexcept override
+    bool onCommand(const Request::_traits_::TypeOf::command       command,
+                   const cetl::string_view                        parameter,
+                   const libcyphal::transport::ServiceRxMetadata& metadata,
+                   Response&                                      response) noexcept override
     {
         response.status = Response::STATUS_SUCCESS;
 
@@ -92,17 +101,23 @@ private:
             //
             std::cout << "🚧 COMMAND_BEGIN_SOFTWARE_UPDATE (file='" << parameter << "')\n";
             node_.heartbeatProducer().message().mode.value = uavcan::node::Mode_1_0::SOFTWARE_UPDATE;
+
+            file_downloader_.emplace(FileDownloader::make(presentation_, time_provider_));
+            file_downloader_->start(metadata.remote_node_id, parameter);
             break;
 
         default:
-            return ExecCmdProvider::onCommand(command, parameter, response);
+            return ExecCmdProvider::onCommand(command, parameter, metadata, response);
         }
         return true;
     }
 
-    libcyphal::application::Node& node_;
-    bool                          should_power_off_{false};
-    bool                          restart_required_{false};
+    libcyphal::application::Node&          node_;
+    libcyphal::presentation::Presentation& presentation_;
+    libcyphal::ITimeProvider&              time_provider_;
+    cetl::optional<FileDownloader>         file_downloader_;
+    bool                                   should_power_off_{false};
+    bool                                   restart_required_{false};
 
 };  // AppExecCmdProvider
 
@@ -119,12 +134,44 @@ enum class ExitCode : std::uint8_t
 
 };  // ExitCode
 
+class TransferIdMap final : public libcyphal::transport::ITransferIdMap
+{
+public:
+    explicit TransferIdMap(cetl::pmr::memory_resource& memory) noexcept
+        : session_spec_to_transfer_id_{&memory}
+    {
+    }
+
+private:
+    using TransferId = libcyphal::transport::TransferId;
+    using PmvAlloc   = cetl::pmr::polymorphic_allocator<std::pair<const SessionSpec, TransferId>>;
+    using PmrMap     = std::unordered_map<SessionSpec, TransferId, std::hash<SessionSpec>, std::equal_to<>, PmvAlloc>;
+
+    // ITransferIdMap
+
+    TransferId getIdFor(const SessionSpec& session_spec) const noexcept override
+    {
+        const auto it = session_spec_to_transfer_id_.find(session_spec);
+        return it != session_spec_to_transfer_id_.end() ? it->second : 0;
+    }
+
+    void setIdFor(const SessionSpec& session_spec, const TransferId transfer_id) noexcept override
+    {
+        session_spec_to_transfer_id_[session_spec] = transfer_id;
+    }
+
+    PmrMap session_spec_to_transfer_id_;
+
+};  // TransferIdMap
+
 void PrintUniqueIdTo(const std::array<std::uint8_t, 16>& unique_id, std::ostream& os)
 {
+    const auto original_flags = os.flags();
     for (const auto byte : unique_id)
     {
         os << std::hex << std::setw(2) << std::setfill('0') << static_cast<std::uint32_t>(byte);
     }
+    os.flags(original_flags);
 }
 
 libcyphal::Expected<bool, ExitCode> run_application(const char* const root_path)
@@ -155,6 +202,7 @@ libcyphal::Expected<bool, ExitCode> run_application(const char* const root_path)
         std::cerr << "❌ Failed to create any transport.\n";
         return ExitCode::TransportCreationFailure;
     }
+    TransferIdMap transfer_id_map{general_mr};
 
     // 2. Create the presentation layer object.
     //
@@ -165,13 +213,16 @@ libcyphal::Expected<bool, ExitCode> run_application(const char* const root_path)
     std::cout << "Unique-ID : ";
     PrintUniqueIdTo(unique_id, std::cout);
     std::cout << "\n";
+    //
     libcyphal::presentation::Presentation presentation{general_mr, executor, *transport_iface};
+    presentation.setTransferIdMap(&transfer_id_map);
 
     // 3. Create the node object with name.
     //
     auto maybe_node = libcyphal::application::Node::make(presentation);
     if (const auto* failure = cetl::get_if<libcyphal::application::Node::MakeFailure>(&maybe_node))
     {
+        (void) failure;
         std::cerr << "❌ Failed to create node (iface='"
                   << static_cast<cetl::string_view>(iface_params.udp_iface.value()) << "').\n";
         return ExitCode::NodeCreationFailure;
@@ -211,9 +262,10 @@ libcyphal::Expected<bool, ExitCode> run_application(const char* const root_path)
 
     // 6. Bring up the command execution provider.
     //
-    auto maybe_exec_cmd_provider = AppExecCmdProvider::make(node, presentation);
+    auto maybe_exec_cmd_provider = AppExecCmdProvider::make(node, presentation, executor);
     if (const auto* failure = cetl::get_if<libcyphal::application::Node::MakeFailure>(&maybe_exec_cmd_provider))
     {
+        (void) failure;
         std::cerr << "❌ Failed to create exec cmd provider.\n";
         return ExitCode::ExecCmdProviderCreationFailure;
     }

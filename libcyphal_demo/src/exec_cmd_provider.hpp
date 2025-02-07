@@ -10,6 +10,8 @@
 #include "libcyphal/application/node.hpp"
 #include "libcyphal/presentation/presentation.hpp"
 #include "libcyphal/presentation/server.hpp"
+#include "libcyphal/time_provider.hpp"
+#include "libcyphal/transport/types.hpp"
 #include "libcyphal/types.hpp"
 
 #include <cetl/pf17/cetlpf.hpp>
@@ -52,9 +54,12 @@ public:
     ///
     /// @param node The application layer node instance. In use to access heartbeat producer.
     /// @param presentation The presentation layer instance. In use to create 'ExecuteCommand' service server.
+    /// @param time_provider The time provider - in use to calculate RPC call deadlines.
     /// @return The ExecuteCommand provider instance or a failure.
     ///
-    static auto make(libcyphal::application::Node& node, libcyphal::presentation::Presentation& presentation)
+    static auto make(libcyphal::application::Node&          node,
+                     libcyphal::presentation::Presentation& presentation,
+                     libcyphal::ITimeProvider&              time_provider)
         -> libcyphal::Expected<Derived, libcyphal::presentation::Presentation::MakeFailure>
     {
         auto maybe_srv = presentation.makeServer<Service>();
@@ -63,7 +68,7 @@ public:
             return std::move(*failure);
         }
 
-        return Derived{node, presentation, cetl::get<Server>(std::move(maybe_srv))};
+        return Derived{node, presentation, time_provider, cetl::get<Server>(std::move(maybe_srv))};
     }
 
     ExecCmdProvider(ExecCmdProvider&& other) noexcept
@@ -96,16 +101,19 @@ public:
     /// The user should override the method to handle custom commands.
     /// If the method returns `false`, the server will respond with a `STATUS_BAD_COMMAND` status.
     ///
-    /// @param command    The command to be executed.
-    /// @param parameter  The command parameter.
-    /// @param response   The response to be sent back to the requester.
+    /// @param command   The command to be executed.
+    /// @param parameter The command parameter.
+    /// @param metadata  The transport RX metadata.
+    /// @param response  The response to be sent back to the requester.
     ///
-    virtual bool onCommand(const Request::_traits_::TypeOf::command command,
-                           const cetl::string_view                  parameter,
-                           Response&                                response) noexcept
+    virtual bool onCommand(const Request::_traits_::TypeOf::command       command,
+                           const cetl::string_view                        parameter,
+                           const libcyphal::transport::ServiceRxMetadata& metadata,
+                           Response&                                      response) noexcept
     {
         (void) command;
         (void) parameter;
+        (void) metadata;
         (void) response;
 
         return false;
@@ -126,7 +134,7 @@ private:
         server_.setOnRequestCallback([this](const auto& arg, auto continuation) {
             //
             Response response{alloc_};
-            if (!onCommand(arg.request.command, makeStringView(arg.request.parameter), response))
+            if (!onCommand(arg.request.command, makeStringView(arg.request.parameter), arg.metadata, response))
             {
                 response.status = Response::STATUS_BAD_COMMAND;
             }
